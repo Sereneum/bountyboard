@@ -1,0 +1,354 @@
+/* =================================================
+   🏴‍☠️ Pirate BountyBoard Style Sheet
+   Автор: Победитель Golden Skull CSS Trophy
+================================================= */
+
+/* -------------------------------------------------
+   🌍 Базовые глобальные стили
+-------------------------------------------------- */
+body {
+    background: #121212 url('../images/parchment-texture.png') repeat;
+    color: #e6d9b8;
+    font-family: 'Trebuchet MS', sans-serif;
+    margin: 0;
+    padding: 0;
+
+    animation: fade-in 1.5s ease-in;
+}
+
+/* -------------------------------------------------
+   🎞️ Анимации
+-------------------------------------------------- */
+@keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes slide-in {
+    0% { opacity: 0; transform: translateY(30px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0); }
+}
+
+@keyframes coin-pop {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 5px #ffd700; }
+    50% { box-shadow: 0 0 20px #ffd700; }
+    100% { box-shadow: 0 0 5px #ffd700; }
+}
+
+@keyframes tooltip-in {
+    0% { opacity: 0; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes beat {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes coin-spin {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50px) scale(1.5) rotate(360deg);
+    }
+}
+
+/* -------------------------------------------------
+   🏴‍☠️ Контейнер списка заданий
+-------------------------------------------------- */
+section.tasks {
+    max-width: 900px;
+    margin: 0.5rem auto;
+    padding: 1rem 2rem;
+    font-family: 'Pirata One', cursive;
+    animation: slide-in 1.2s ease-out;
+}
+
+section.tasks h2 {
+    animation: fade-in 2s ease-in;
+}
+
+
+/* -------------------------------------------------
+   📜 Список задач
+-------------------------------------------------- */
+.task-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    font-family: 'Pirata One', cursive;
+}
+
+
+/* -------------------------------------------------
+   📦 Карточка задачи
+-------------------------------------------------- */
+.task-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 2px solid #d49f1e;
+    border-radius: 10px;
+    background-color: #222;
+    box-shadow: 0 0 8px rgba(212, 159, 30, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    animation: slide-in 0.6s ease-out;
+}
+
+.task-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 12px 4px #ffd70077;
+}
+
+.task-item.active {
+    animation: pulse 2s infinite;
+}
+
+
+/* -------------------------------------------------
+   ⚓ Левая часть задачи
+-------------------------------------------------- */
+.task-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-family: 'Pirata One', cursive;
+}
+
+.task-title {
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+.task-desc {
+    font-size: 1rem;
+    color: #ccc;
+    font-style: italic;
+}
+
+.task-bounty {
+    font-size: 1.1rem;
+    color: #ffd700;
+}
+
+
+/* -------------------------------------------------
+   ⚔️ Правая часть задачи (кнопки)
+-------------------------------------------------- */
+.task-right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+
+/* -------------------------------------------------
+   🔘 Кнопки
+-------------------------------------------------- */
+.btn {
+    background-color: #8b4513;
+    color: #fff5d1;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Pirata One', cursive;
+    box-shadow: 0 0 5px #d49f1e;
+    transition: background-color 0.3s ease;
+    font-size: 1rem;
+    text-decoration: none;
+}
+
+.btn:hover {
+    background-color: #a0522d;
+    transform: rotate(3deg);
+}
+
+
+/* -------------------------------------------------
+   📘 Кнопка показа описания
+-------------------------------------------------- */
+.btn-desc {
+    background: #d49f1e;
+    color: #1a1a1a;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-family: 'Pirata One', cursive;
+    transition: all 0.3s ease;
+}
+
+.btn-desc:hover {
+    background: #f3c969;
+    transform: rotate(-3deg) scale(1.05);
+}
+
+
+/* -------------------------------------------------
+   ✅ Стиль выполненной задачи
+-------------------------------------------------- */
+.done {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+
+/* -------------------------------------------------
+   🧾 Модальное окно (описание задачи)
+-------------------------------------------------- */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.75);
+}
+
+.modal.show {
+    display: block;
+}
+
+.modal-content {
+    background-color: #1e1e1e;
+    margin: 10% auto;
+    padding: 2rem;
+    border: 2px solid #f3c969;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    color: #e6d9b8;
+    box-shadow: 0 0 20px #f3c969;
+    position: relative;
+    text-align: center;
+    font-family: 'Pirata One', cursive;
+    animation: fade-in 0.5s ease-out;
+}
+
+.modal-content h3 {
+    font-size: 1.6rem;
+    color: #ffd700;
+}
+
+.modal-content p {
+    font-size: 1.1rem;
+}
+
+
+/* -------------------------------------------------
+   ❌ Кнопка закрытия модального окна
+-------------------------------------------------- */
+.close {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    font-size: 1.8rem;
+    color: #f3c969;
+    cursor: pointer;
+}
+
+
+/* -------------------------------------------------
+   ⚓ Верхняя панель (Header)
+-------------------------------------------------- */
+header {
+    animation: slide-in 1s ease-out;
+}
+
+header h1 {
+    font-size: 3.5rem;
+    margin-bottom: 0.1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+header p {
+    font-size: 1.2rem;
+    font-style: italic;
+    color: #d1b875;
+    margin-bottom: 0.2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    animation: fade-in 2s ease-in;
+}
+
+header .emoji {
+    font-size: 3.5rem;
+    animation: float 4s ease-in-out infinite;
+}
+
+
+/* -------------------------------------------------
+   ⚓ Нижняя панель (Footer)
+-------------------------------------------------- */
+footer {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    margin-top: 3rem;
+    font-size: 0.9rem;
+    color: #aaa;
+    font-family: 'Pirata One', cursive;
+}
+
+
+/* -------------------------------------------------
+   💰 Монеты при завершении
+-------------------------------------------------- */
+.coin-burst {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: url('../images/coin.png') no-repeat center/contain;
+    animation: coin-pop 0.6s ease-out forwards;
+    /*animation: coin-spin 0.3s ease-out forwards;*/
+    pointer-events: none;
+}
+
+
+/* -------------------------------------------------
+   🎶 Музыкальная иконка
+-------------------------------------------------- */
+.music-icon.playing {
+    animation: beat 0.8s ease-in-out infinite;
+}
+
+
+/* -------------------------------------------------
+   🧭 Tooltip (подсказка)
+-------------------------------------------------- */
+.tooltip {
+    animation: tooltip-in 0.3s ease-out;
+    background: #2b2b2b;
+    color: #ffd700;
+    padding: 0.4rem 0.8rem;
+    border-radius: 5px;
+    font-size: 0.9rem;
+}

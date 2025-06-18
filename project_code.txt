@@ -1,0 +1,707 @@
+==== ./cmd/server/main.go ====
+package main
+
+import (
+	"bountyboard/internal/cache"
+	"bountyboard/internal/handler"
+	"bountyboard/internal/model"
+	"bountyboard/internal/prettylog"
+	"bountyboard/internal/storage/in-memory"
+	"bountyboard/internal/task"
+	"context"
+	"encoding/gob"
+	"errors"
+	"html/template"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
+)
+
+var (
+	cachePath = "task-cache.gob"
+)
+
+func init() {
+	gob.Register(&model.Task{})
+}
+
+/*
+	API:
+		POST:
+		/add <->
+		PUT:
+		/put
+*/
+
+func main() {
+	prettylog.InitLogger("debug")
+	slog.Info("init", slog.String("entry", "logger"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	repo := in_memory.NewRepo()
+	slog.Info("init", slog.String("entry", "in-memory repo"))
+
+	c := setupCache(ctx, cachePath)
+	slog.Info("init", slog.String("entry", "task cache"))
+
+	service := task.NewService(repo, c)
+	slog.Info("init", slog.String("entry", "task service"))
+
+	tmpl, err := template.ParseFiles(
+		filepath.Join("web", "templates", "layout.html"),
+		filepath.Join("web", "templates", "tasks.html"),
+	)
+	if err != nil {
+		slog.Info("error", slog.String("entry", "templates"))
+		os.Exit(1)
+	}
+
+	slog.Info("init", slog.String("entry", "html template"))
+
+	h := handler.NewHandler(service, tmpl)
+	slog.Info("init", slog.String("entry", "task handler"))
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", h.Main)
+	mux.HandleFunc("/list", h.List)
+	mux.HandleFunc("/add", h.Add)
+
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static"))))
+	slog.Info("init", slog.String("entry", "static"))
+
+	server := http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	go func() {
+		slog.Info("Starting server", slog.String("addr", server.Addr))
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+	}()
+
+	sign := make(chan os.Signal, 1)
+	signal.Notify(sign, syscall.SIGINT, syscall.SIGTERM)
+
+	<-sign
+	// shutdown HTTP server
+	ctxShutdown, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(ctxShutdown); err != nil {
+		slog.Error("server shutdown error", slog.String("err", err.Error()))
+	} else {
+		slog.Info("HTTP server shutdown completed")
+	}
+
+	// save cache one last time
+	if err := c.SaveToFile(cachePath); err != nil {
+		slog.Error("failed to save task cache", slog.String("err", err.Error()))
+	} else {
+		slog.Info("task cache saved")
+	}
+}
+
+func setupCache(ctx context.Context, filepath string) *cache.TaskCache {
+	ttl := 7 * 24 * time.Hour
+	jttl := 10 * time.Minute
+	sttl := 1 * time.Hour
+
+	c := cache.NewTaskCache(ttl)
+	go c.Janitor(ctx, jttl)
+	go c.RunAutoSave(ctx, filepath, sttl)
+
+	if err := c.LoadFromFile(filepath); err != nil {
+		slog.Error("task cache error", slog.String("err", err.Error()))
+	}
+
+	return c
+}
+
+
+==== ./internal/cache/cache.go ====
+package cache
+
+import (
+	"context"
+	"encoding/gob"
+	"log/slog"
+	"os"
+	"sync"
+	"time"
+
+	"bountyboard/internal/model"
+)
+
+type cacheEntry struct {
+	Tasks      []*model.Task
+	Expiration time.Time
+}
+
+type TaskCache struct {
+	data map[string]cacheEntry
+	mu   sync.RWMutex
+	ttl  time.Duration
+}
+
+func NewTaskCache(ttl time.Duration) *TaskCache {
+	return &TaskCache{
+		ttl:  ttl,
+		data: make(map[string]cacheEntry),
+	}
+}
+
+// Get возвращает кэшированные задачи для userID, если они существуют и не устарели
+func (c *TaskCache) Get(userID string) ([]*model.Task, bool) {
+	c.mu.RLock()
+	entry, found := c.data[userID]
+	c.mu.RUnlock()
+
+	if !found {
+		return nil, false
+	}
+	if time.Now().After(entry.Expiration) {
+		// Кэш просрочен, но мы не удаляем его здесь
+		return nil, false
+	}
+	return entry.Tasks, true
+}
+
+// Set сохраняет задачи в кэш с TTL
+func (c *TaskCache) Set(userID string, tasks []*model.Task) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.data[userID] = cacheEntry{
+		Tasks:      tasks,
+		Expiration: time.Now().Add(c.ttl),
+	}
+}
+
+// Invalidate удаляет кэш для конкретного пользователя
+func (c *TaskCache) Invalidate(userID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.data, userID)
+}
+
+// Janitor чистит устаревший кэш
+func (c *TaskCache) Janitor(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			c.cleanupExpired()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (c *TaskCache) cleanupExpired() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	for userID, entry := range c.data {
+		if now.After(entry.Expiration) {
+			delete(c.data, userID)
+		}
+	}
+}
+
+func (c *TaskCache) SaveToFile(path string) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(f)
+	return enc.Encode(c.data)
+}
+
+func (c *TaskCache) LoadFromFile(path string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	dec := gob.NewDecoder(f)
+	return dec.Decode(&c.data)
+}
+
+func (c *TaskCache) RunAutoSave(ctx context.Context, filepath string, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+
+			if err := c.SaveToFile(filepath); err != nil {
+				slog.Error("auto-save failed", slog.String("err", err.Error()))
+			} else {
+				slog.Debug("cache auto-saved", slog.String("path", filepath))
+			}
+		}
+	}
+}
+
+
+==== ./internal/handler/handler.go ====
+package handler
+
+import (
+	"bountyboard/internal/model"
+	"bountyboard/internal/task"
+	"encoding/json"
+	"html/template"
+	"io"
+	"log/slog"
+	"net/http"
+)
+
+type Data struct {
+	Title        string
+	Description  template.HTML
+	BountyAmount int
+}
+
+type PageData struct {
+	Tasks []*model.Task
+}
+
+type TaskHandler struct {
+	service *task.Service
+	tmpl    *template.Template
+}
+
+type createTaskRequest struct {
+	UserID       string `json:"user_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	BountyAmount int    `json:"bounty_amount"`
+}
+
+func NewHandler(service *task.Service, t *template.Template) *TaskHandler {
+	return &TaskHandler{service: service, tmpl: t}
+}
+
+func (h *TaskHandler) Main(w http.ResponseWriter, r *http.Request) {
+	userID := "demo"
+	tasks, _ := h.service.ListTasks(userID)
+
+	data := PageData{Tasks: tasks}
+	//data := newPageData(tasks)
+
+	if err := h.tmpl.Execute(w, data); err != nil {
+		e := "template execute error:"
+		slog.Error(e, slog.String("detail", err.Error()))
+		http.Error(w, e, http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
+	slog.Info("request", slog.String("url", "/"))
+	userID := "demo"
+
+	tasks, err := h.service.ListTasks(userID)
+	if err != nil {
+		http.Error(w, "failed to load tasks", http.StatusInternalServerError)
+		return
+	}
+
+	buf, err := json.Marshal(tasks)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(buf)
+}
+
+func (h *TaskHandler) Add(w http.ResponseWriter, r *http.Request) {
+	slog.Info("request", slog.String("url", "/add"))
+	if r.Method != http.MethodPost {
+		e := "method not allowed"
+		slog.Info("request-error", slog.String("err", e))
+		http.Error(w, e, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req createTaskRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		e := "invalid request body"
+		body, _ := io.ReadAll(r.Body)
+		slog.Info(
+			"request-error",
+			slog.String("err", e),
+			slog.String("details", err.Error()),
+			slog.String("body", string(body)),
+		)
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	if req.UserID == "" || req.Title == "" {
+		e := "missing required fields"
+		slog.Info("request-error", slog.String("err", e))
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.CreateTask(req.UserID, req.Title, req.Description, req.BountyAmount); err != nil {
+		e := "failed to create task"
+		slog.Info("request-error", slog.String("err", e), slog.String("details", err.Error()))
+		http.Error(w, e, http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("request-good", slog.String("do", "task-created"))
+	w.WriteHeader(http.StatusCreated)
+	_, _ = w.Write([]byte(`{"status":"created"}`))
+}
+
+
+==== ./internal/model/task.go ====
+package model
+
+type Task struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Done         bool   `json:"done"`
+	BountyAmount int    `json:"bounty_amount"`
+	UserID       string `json:"user_id"`
+}
+
+
+==== ./internal/prettylog/log.go ====
+package prettylog
+
+import (
+	"context"
+	"encoding/json"
+	"github.com/fatih/color"
+	"io"
+	"log"
+	"log/slog"
+	"os"
+)
+
+type PrettyHandlerOptions struct {
+	SlogOpts slog.HandlerOptions
+}
+
+type PrettyHandler struct {
+	slog.Handler
+	l *log.Logger
+}
+
+func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
+	level := r.Level.String() + ":"
+
+	switch r.Level {
+	case slog.LevelDebug:
+		level = color.MagentaString(level)
+	case slog.LevelInfo:
+		level = color.BlueString(level)
+	case slog.LevelWarn:
+		level = color.YellowString(level)
+	case slog.LevelError:
+		level = color.RedString(level)
+	}
+
+	fields := make(map[string]interface{}, r.NumAttrs())
+	r.Attrs(func(a slog.Attr) bool {
+		fields[a.Key] = a.Value.Any()
+
+		return true
+	})
+
+	//b, err := json.MarshalIndent(fields, "", "  ")
+	b, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+
+	timeStr := r.Time.Format("[15:05:05.000]")
+	msg := color.CyanString(r.Message)
+
+	h.l.Println(timeStr, level, msg, color.WhiteString(string(b)))
+
+	return nil
+}
+
+func NewPrettyHandler(
+	out io.Writer,
+	opts PrettyHandlerOptions,
+) *PrettyHandler {
+	h := &PrettyHandler{
+		Handler: slog.NewJSONHandler(out, &opts.SlogOpts),
+		l:       log.New(out, "", 0),
+	}
+
+	return h
+}
+
+func InitLogger(logLevel string) {
+	opts := PrettyHandlerOptions{}
+
+	switch logLevel {
+	case "debug":
+		opts.SlogOpts = slog.HandlerOptions{Level: slog.LevelDebug}
+	default:
+		opts.SlogOpts = slog.HandlerOptions{Level: slog.LevelInfo}
+	}
+
+	slog.SetDefault(slog.New(NewPrettyHandler(os.Stdout, opts)))
+}
+
+
+==== ./internal/storage/in-memory/in-memory.go ====
+package in_memory
+
+import (
+	"bountyboard/internal/model"
+	"sync"
+)
+
+type Repo struct {
+	mu    sync.RWMutex
+	tasks map[string]*model.Task
+}
+
+func NewRepo() *Repo {
+	return &Repo{tasks: make(map[string]*model.Task)}
+}
+
+func (r *Repo) Create(t *model.Task) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tasks[t.ID] = t
+	return nil
+}
+
+func (r *Repo) ListByUser(userID string) ([]*model.Task, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var res []*model.Task
+	for _, t := range r.tasks {
+		if t.UserID == userID {
+			res = append(res, t)
+		}
+	}
+	return res, nil
+}
+
+func (r *Repo) Complete(id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t, ok := r.tasks[id]; ok {
+		t.Done = true
+	}
+	return nil
+}
+
+
+==== ./internal/task/repository.go ====
+package task
+
+import "bountyboard/internal/model"
+
+type Repository interface {
+	Create(task *model.Task) error
+	ListByUser(userID string) ([]*model.Task, error)
+	Complete(id string) error
+}
+
+
+==== ./internal/task/service.go ====
+package task
+
+import (
+	"bountyboard/internal/cache"
+	"bountyboard/internal/model"
+	"github.com/google/uuid"
+)
+
+type Service struct {
+	repo  Repository
+	cache *cache.TaskCache
+}
+
+func NewService(r Repository, c *cache.TaskCache) *Service {
+	return &Service{repo: r, cache: c}
+}
+
+func (s *Service) CreateTask(userID, title, description string, amount int) error {
+	task := &model.Task{
+		ID:           uuid.NewString(),
+		Title:        title,
+		Description:  description,
+		Done:         false,
+		BountyAmount: amount,
+		UserID:       userID,
+	}
+
+	if err := s.repo.Create(task); err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		s.cache.Invalidate(userID)
+	}
+
+	return nil
+}
+
+func (s *Service) ListTasks(userID string) ([]*model.Task, error) {
+	if s.cache != nil {
+		if cached, ok := s.cache.Get(userID); ok {
+			return cached, nil
+		}
+	}
+
+	tasks, err := s.repo.ListByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.cache != nil {
+		s.cache.Set(userID, tasks)
+	}
+
+	return tasks, nil
+}
+
+func (s *Service) CompleteTask(id string) error {
+	return s.repo.Complete(id)
+}
+
+
+==== ./internal/utils/utils.go ====
+package utils
+
+import (
+	"bytes"
+	"github.com/yuin/goldmark"
+	"html/template"
+)
+
+func MdToHTML(md string) template.HTML {
+	var buf bytes.Buffer
+	if err := goldmark.Convert([]byte(md), &buf); err != nil {
+		return template.HTML("<p><em>Error parsing description</em></p>")
+	}
+	return template.HTML(buf.String())
+}
+
+
+==== ./pkg/copy_to_text/ctext.go ====
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func main() {
+
+	p, _ := os.Getwd()
+	fmt.Println(p)
+
+	if err := DumpGoProject(".", "project_code.txt"); err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Code dump saved to project_code.txt")
+	}
+}
+
+// DumpGoProject собирает все .go файлы в модуле и сохраняет их в один текстовый файл.
+func DumpGoProject(rootDir string, outputFile string) error {
+	moduleRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("cannot find go.mod: %w", err)
+	}
+
+	var buffer bytes.Buffer
+
+	err = filepath.WalkDir(moduleRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") || d.Name() == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) == ".go" {
+			relPath, _ := filepath.Rel(moduleRoot, path)
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("error reading %s: %w", path, err)
+			}
+
+			buffer.WriteString(fmt.Sprintf("==== ./%s ====\n", strings.Replace(relPath, "\\", "/", -1)))
+			buffer.Write(content)
+			buffer.WriteString("\n\n")
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(outputFile, buffer.Bytes(), 0644)
+}
+
+// findGoModRoot ищет корень модуля Go (директорию с go.mod).
+func findGoModRoot(startDir string) (string, error) {
+	dir := startDir
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("go.mod not found")
+		}
+		dir = parent
+	}
+}
+
+

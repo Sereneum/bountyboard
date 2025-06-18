@@ -1,0 +1,101 @@
+package handlers
+
+import (
+	"bountyboard/internal/domain/task"
+	"encoding/json"
+	"html/template"
+	"log/slog"
+	"net/http"
+)
+
+type TaskHandler struct {
+	service task.Service
+	tmpl    *template.Template
+}
+
+func NewHandler(service task.Service, t *template.Template) *TaskHandler {
+	return &TaskHandler{service: service, tmpl: t}
+}
+
+type Data struct {
+	Title        string
+	Description  template.HTML
+	BountyAmount int
+}
+
+// Main выводит HTML-страницу с задачами
+func (h *TaskHandler) Main(w http.ResponseWriter, r *http.Request) {
+	userID := "demo" // TODO: заменить на реальный userID из аутентификации
+	tasks, err := h.service.ListTasks(userID)
+	if err != nil {
+		slog.Error("failed to list tasks", slog.String("err", err.Error()))
+		http.Error(w, "failed to load tasks", http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		Tasks []*task.Task
+	}{
+		Tasks: tasks,
+	}
+
+	if err = h.tmpl.Execute(w, data); err != nil {
+		slog.Error("template execute error", slog.String("err", err.Error()))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	}
+}
+
+// List возвращает JSON-массив задач
+func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
+	slog.Info("request", slog.String("url", r.URL.Path))
+	userID := "demo" // TODO: заменить на реальный userID из аутентификации
+
+	tasks, err := h.service.ListTasks(userID)
+	if err != nil {
+		http.Error(w, "failed to load tasks", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err = json.NewEncoder(w).Encode(tasks); err != nil {
+		http.Error(w, "failed to encode tasks", http.StatusInternalServerError)
+	}
+}
+
+// createTaskRequest структура для декодирования JSON-запроса
+type createTaskRequest struct {
+	UserID       string `json:"user_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	BountyAmount int    `json:"bounty_amount"`
+}
+
+// Add создает новую задачу
+func (h *TaskHandler) Add(w http.ResponseWriter, r *http.Request) {
+	slog.Info("request", slog.String("url", r.URL.Path))
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req createTaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Info("invalid request body", slog.String("err", err.Error()))
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.UserID == "" || req.Title == "" {
+		http.Error(w, "missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.CreateTask(req.UserID, req.Title, req.Description, req.BountyAmount); err != nil {
+		slog.Info("failed to create task", slog.String("err", err.Error()))
+		http.Error(w, "failed to create task", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_, _ = w.Write([]byte(`{"status":"created"}`))
+}

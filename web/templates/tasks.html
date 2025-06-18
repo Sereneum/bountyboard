@@ -1,0 +1,35 @@
+{{ define "content" }}
+<section class="tasks">
+    <h2>Your Tasks</h2>
+    <ul class="task-list">
+        {{ range .Tasks }}
+        <li class="task-item {{ if .Done }}done{{ end }}">
+            <div class="task-left">
+                <span class="task-title">{{ .Title }}</span>
+                <span class="task-bounty">💰 {{ .BountyAmount }} gold</span>
+            </div>
+            <div class="task-right">
+                <button class="btn btn-desc">📜</button>
+                {{ if .Done }}
+                <span class="status">✅ Completed</span>
+                {{ else }}
+                <button data-id="{{ .ID }}" class="btn btn-complete">Mark as Done</button>
+                {{ end }}
+            </div>
+        </li>
+
+        <!-- Modal -->
+        <div id="modal-{{ .ID }}" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>{{ .Title }}</h3>
+                <p>{{ .Description }}</p>
+                <p><strong>Reward:</strong> 💰 {{ .BountyAmount }} gold</p>
+            </div>
+        </div>
+        {{ else }}
+        <li>No tasks yet — sail on and add some!</li>
+        {{ end }}
+    </ul>
+</section>
+{{ end }}

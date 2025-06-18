@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>BountyBoard 🏴‍☠️</title>
+    <link rel="stylesheet" href="/static/css/style.css"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+</head>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const modals = document.querySelectorAll('.modal');
+        const openButtons = document.querySelectorAll('.btn-desc');
+        const closeButtons = document.querySelectorAll('.close');
+
+        // === 📜 Открытие модалки ===
+        openButtons.forEach((btn, idx) => {
+            btn.addEventListener('click', () => {
+                modals[idx].classList.add('show');
+            });
+        });
+
+        // ❌ Закрытие по кнопке
+        closeButtons.forEach((btn, idx) => {
+            btn.addEventListener('click', () => {
+                modals[idx].classList.remove('show');
+            });
+        });
+
+        // ❌ Закрытие по клику вне
+        window.addEventListener('click', (e) => {
+            modals.forEach(modal => {
+                if (e.target === modal) modal.classList.remove('show');
+            });
+        });
+
+        // === 💰 Выполнение задачи ===
+        document.querySelectorAll(".btn-complete").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const taskItem = btn.closest(".task-item");
+                const taskId = taskItem.dataset.id || "unknown";
+
+                // ✅ AJAX-запрос
+                try {
+                    await fetch("/complete-task", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ id: taskId }),
+                    });
+                } catch (err) {
+                    console.error("Ошибка отправки:", err);
+                }
+
+                // 💥 Эффекты
+                taskItem.classList.add("done");
+
+                for (let i = 0; i < 16; i++) {
+                    createCoin(taskItem);
+                }
+
+                // setTimeout(() => taskItem.remove(), 1000);
+            });
+        });
+
+        // 🎉 Монетка
+        function createCoin(parent) {
+            const coin = document.createElement("div");
+            coin.classList.add("coin-burst");
+
+            const rect = parent.getBoundingClientRect();
+            const x = Math.random() * rect.width;
+            const y = Math.random() * rect.height;
+
+            coin.style.left = `${x}px`;
+            coin.style.top = `${y}px`;
+
+            parent.appendChild(coin);
+            setTimeout(() => coin.remove(), 1200);
+        }
+    });
+</script>
+
+
+
+<body>
+<div class="rope rope-left"></div>
+<div class="rope rope-right"></div>
+
+<header>
+    <h1><span class="emoji">🏴‍☠️</span>BountyBoard</h1>
+    <p class="subtitle">Track your tasks like a true pirate!</p>
+</header>
+
+<main>
+    {{ block "content" . }}{{ end }}
+</main>
+
+<footer>
+    <p>Made with rum and Go 🦜</p>
+</footer>
+</body>
+</html>
