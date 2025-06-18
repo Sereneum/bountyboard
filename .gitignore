@@ -70,3 +70,9 @@ coverage.xml
 
 # Go data files
 *.gob
+
+#Text
+*.txt
+
+#Ctext
+/pkg/ctext
