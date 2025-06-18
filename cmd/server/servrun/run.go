@@ -39,9 +39,9 @@ func Run() error {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", app.Handler.Main)
-	mux.HandleFunc("/list", app.Handler.List)
-	mux.HandleFunc("/add", app.Handler.Add)
+	mux.HandleFunc("/", app.Handlers.Static.Main)
+	mux.HandleFunc("/list", app.Handlers.Task.List)
+	mux.HandleFunc("/add", app.Handlers.Task.Add)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static"))))
 
 	server := &http.Server{
@@ -54,7 +54,7 @@ func Run() error {
 
 	go func() {
 		slog.Info("Starting server", slog.String("addr", server.Addr))
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err = server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error(err.Error())
 			os.Exit(1)
 		}

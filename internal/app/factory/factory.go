@@ -13,8 +13,8 @@ import (
 )
 
 type Factory struct {
-	cachePath string
 	ctx       context.Context
+	cachePath string // TODO - cfg
 	tmpl      *template.Template
 }
 
