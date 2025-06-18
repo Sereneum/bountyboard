@@ -23,8 +23,8 @@ func main() {
 package servrun
 
 import (
-	"bountyboard/internal/adapter/cache/memory"
 	"bountyboard/internal/app/factory"
+	"bountyboard/internal/domain/task"
 	"context"
 	"errors"
 	"html/template"
@@ -95,7 +95,7 @@ func Run() error {
 		slog.Info("HTTP server shutdown completed")
 	}
 
-	if fc, ok := app.TaskService.Cache().(memory.FileCache); ok {
+	if fc, ok := app.TaskService.Cache().(task.FileCache); ok {
 		if err = fc.SaveToFile(cachePath); err != nil {
 			slog.Error("failed to save task cache", slog.String("err", err.Error()))
 		} else {
@@ -119,14 +119,6 @@ import (
 	"sync"
 	"time"
 )
-
-type FileCache interface {
-	task.Cache // Базовый интерфейс
-	SaveToFile(filename string) error
-	LoadFromFile(filename string) error
-	RunAutoSave(ctx context.Context, filepath string, interval time.Duration)
-	Janitor(ctx context.Context, interval time.Duration)
-}
 
 type cacheEntry struct {
 	Tasks      []*task.Task
@@ -404,7 +396,7 @@ func (r *Renderer) RenderTasks(w http.ResponseWriter, tasks []*task.Task) {
 
 
 ==== ./internal/adapter/storage/in-memory/store.go ====
-package inmemeory
+package inmemory
 
 import (
 	"bountyboard/internal/domain/task"
@@ -517,11 +509,13 @@ package factory
 
 import (
 	"bountyboard/internal/adapter/cache/memory"
-	inmemeory "bountyboard/internal/adapter/storage/in-memory"
+	inmemory "bountyboard/internal/adapter/storage/in-memory"
 	"bountyboard/internal/app"
 	"context"
+	"fmt"
 	"html/template"
 	"log/slog"
+	"os"
 	"time"
 )
 
@@ -541,14 +535,18 @@ func NewFactory(ctx context.Context, cachePath string, tmpl *template.Template) 
 
 func (f *Factory) BuildApp() (*app.App, error) {
 	// 1. Репозиторий
-	repo := inmemeory.NewRepo()
+	repo := inmemory.NewRepo()
 
 	// 2. Кэш
 	cache := memory.NewTaskCache(7 * 24 * time.Hour)
 	go cache.Janitor(f.ctx, 10*time.Minute)
 	go cache.RunAutoSave(f.ctx, f.cachePath, time.Hour)
+
 	if err := cache.LoadFromFile(f.cachePath); err != nil {
-		slog.Error("task cache error", slog.String("err", err.Error()))
+		if !os.IsNotExist(err) { // Игнорируем если файла нет
+			return nil, fmt.Errorf("failed to load cache: %w", err)
+		}
+		slog.Warn("cache file not found, starting with empty cache")
 	}
 
 	// 3. Настраиваем и возвращаем App
@@ -576,6 +574,11 @@ type Task struct {
 ==== ./internal/domain/task/repository.go ====
 package task
 
+import (
+	"context"
+	"time"
+)
+
 type Repository interface {
 	Create(task *Task) error
 	ListByUser(userID string) ([]*Task, error)
@@ -587,6 +590,15 @@ type Cache interface {
 	Get(userID string) ([]*Task, bool)
 	Set(userID string, tasks []*Task)
 	Invalidate(userID string)
+}
+
+// FileCache дополненный интерфейс кеша для задач с реализацией сохранения кэша в файл
+type FileCache interface {
+	Cache // Базовый интерфейс
+	SaveToFile(filename string) error
+	LoadFromFile(filename string) error
+	RunAutoSave(ctx context.Context, filepath string, interval time.Duration)
+	Janitor(ctx context.Context, interval time.Duration)
 }
 
 
