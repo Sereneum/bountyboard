@@ -1,25 +1,28 @@
 package app
 
 import (
-	"bountyboard/internal/adapter/http/handlers"
+	"bountyboard/internal/domain/auth"
 	"bountyboard/internal/domain/task"
 	"html/template"
+	"net/http"
 )
 
 type App struct {
-	TaskService task.Service
-	Handlers    *handlers.Handlers
+	Router http.Handler
 }
 
-func Setup(repo task.Repository, cache task.Cache, tmpl *template.Template) (*App, error) {
-	// Создаем сервис из repo и cache
-	service := task.New(repo, cache)
+type Config struct {
+	Repo      task.Repository
+	Cache     task.Cache
+	Templates *template.Template
+	Auth      auth.Service
+}
 
-	// Создаем хендлер, передаем сервис и шаблоны
-	h := handlers.NewHandlers(service, tmpl)
+func Setup(cfg Config) (*App, error) {
+	taskService := task.New(cfg.Repo, cfg.Cache)
+	router := InitRouter(taskService, cfg.Auth, cfg.Templates)
 
 	return &App{
-		TaskService: service,
-		Handlers:    h,
+		Router: router,
 	}, nil
 }

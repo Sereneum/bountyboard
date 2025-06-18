@@ -1,18 +1,25 @@
 package handlers
 
 import (
+	"bountyboard/internal/domain/task"
 	"encoding/json"
+	"html/template"
 	"log/slog"
 	"net/http"
 )
 
 type TaskHandler struct {
-	*baseHandler
+	service task.Service
+	tmpl    *template.Template
+}
+
+func NewTaskHandler(service task.Service, tmpl *template.Template) *TaskHandler {
+	return &TaskHandler{service: service, tmpl: tmpl}
 }
 
 // List возвращает JSON-массив задач
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	slog.Info("request", slog.String("url", r.URL.Path))
+	// slog.Info("request", slog.String("url", r.URL.Path))
 	userID := "demo" // TODO: заменить на реальный userID из аутентификации
 
 	tasks, err := h.service.ListTasks(userID)
@@ -37,7 +44,7 @@ type createTaskRequest struct {
 
 // Add создает новую задачу
 func (h *TaskHandler) Add(w http.ResponseWriter, r *http.Request) {
-	slog.Info("request", slog.String("url", r.URL.Path))
+	// slog.Info("request", slog.String("url", r.URL.Path))
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

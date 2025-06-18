@@ -4,6 +4,8 @@ import (
 	"bountyboard/internal/adapter/cache/memory"
 	inmemory "bountyboard/internal/adapter/storage/in-memory"
 	"bountyboard/internal/app"
+	"bountyboard/internal/domain/auth"
+	"bountyboard/internal/domain/task"
 	"context"
 	"fmt"
 	"html/template"
@@ -26,7 +28,7 @@ func NewFactory(ctx context.Context, cachePath string, tmpl *template.Template) 
 	}
 }
 
-func (f *Factory) BuildApp() (*app.App, error) {
+func (f *Factory) BuildApp() (*app.App, task.FileCache, error) {
 	// 1. Репозиторий
 	repo := inmemory.NewRepo()
 
@@ -37,11 +39,25 @@ func (f *Factory) BuildApp() (*app.App, error) {
 
 	if err := cache.LoadFromFile(f.cachePath); err != nil {
 		if !os.IsNotExist(err) { // Игнорируем если файла нет
-			return nil, fmt.Errorf("failed to load cache: %w", err)
+			return nil, nil, fmt.Errorf("failed to load cache: %w", err)
 		}
 		slog.Warn("cache file not found, starting with empty cache")
 	}
 
+	authService := auth.New("secret") // TODO os.Getenv("JWT_SECRET")
+
 	// 3. Настраиваем и возвращаем App
-	return app.Setup(repo, cache, f.tmpl)
+	appCfg := app.Config{
+		Repo:      repo,
+		Cache:     cache,
+		Templates: f.tmpl,
+		Auth:      authService,
+	}
+
+	a, err := app.Setup(appCfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return a, cache, nil
 }

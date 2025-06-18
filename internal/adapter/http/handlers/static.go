@@ -2,12 +2,22 @@ package handlers
 
 import (
 	"bountyboard/internal/domain/task"
+	"html/template"
 	"log/slog"
 	"net/http"
 )
 
+//type StaticHandler struct {
+//	*baseHandler
+//}
+
 type StaticHandler struct {
-	*baseHandler
+	service task.Service
+	tmpl    *template.Template
+}
+
+func NewStaticHandler(service task.Service, tmpl *template.Template) *StaticHandler {
+	return &StaticHandler{service: service, tmpl: tmpl}
 }
 
 func (h *StaticHandler) Main(w http.ResponseWriter, r *http.Request) {
