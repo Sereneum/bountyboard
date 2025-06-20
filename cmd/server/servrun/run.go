@@ -1,10 +1,10 @@
 package servrun
 
 import (
+	"bountyboard/internal/adapter/http/renderer"
 	"bountyboard/internal/app/factory"
 	"context"
 	"errors"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,15 +22,26 @@ func Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tmpl, err := template.ParseFiles(
-		filepath.Join("web", "templates", "layout.html"),
-		filepath.Join("web", "templates", "tasks.html"),
-	)
-	if err != nil {
+	// TODO renderer -> jet
+	r := renderer.NewRenderer()
+	layout := filepath.Join("web", "templates", "layout.html")
+	if err := r.Add(layout, filepath.Join("web", "templates", "tasks.html"), "tasks"); err != nil {
 		return err
 	}
+	if err := r.Add(layout, filepath.Join("web", "templates", "profile.html"), "profile"); err != nil {
+		return err
+	}
+	//
+	//tmpl, err := template.ParseFiles(
+	//	filepath.Join("web", "templates", "layout.html"),
+	//	filepath.Join("web", "templates", "tasks.html"),
+	//	filepath.Join("web", "templates", "profile.html"),
+	//)
+	//if err != nil {
+	//	return err
+	//}
 
-	f := factory.NewFactory(ctx, "task-cache.gob", tmpl)
+	f := factory.NewFactory(ctx, "task-cache.gob", r)
 
 	app, cache, err := f.BuildApp()
 	if err != nil {

@@ -12,17 +12,39 @@
 <div class="rope rope-left"></div>
 <div class="rope rope-right"></div>
 
-<header>
-    <h1><span class="emoji">🏴‍☠️</span>BountyBoard</h1>
-    <p class="subtitle">Track your tasks like a true pirate!</p>
+<header class="site-header">
+    <div class="container">
+        <!-- Левая часть: логотип -->
+        <div class="header-left">
+            <a href="/" class="logo">
+                🏴‍☠️ BountyBoard
+            </a>
+        </div>
+
+        <!-- Центр: навигация -->
+        <nav class="nav-links">
+            <a href="/" class="nav-item">📜 Quests</a>
+            <a href="/profile" class="nav-item">🧭 Profile</a>
+            <a href="/shop" class="nav-item">🏪 Shop</a>
+        </nav>
+
+        <!-- Правая часть: золото и юзер -->
+        <div class="header-right">
+            <span class="gold-display">💰 666 gold</span>
+            <span class="user-display">🦜 Captain Kraken</span>
+        </div>
+    </div>
 </header>
 
 <main>
     {{ block "content" . }}{{ end }}
 </main>
 
+
 <footer>
     <p>Made with rum and Go 🦜</p>
+    <!--    <img src="/static/images/compass.svg" alt="compass" class="compass-icon" />-->
+    <!--    SVG-компас-->
 </footer>
 </body>
 </html>

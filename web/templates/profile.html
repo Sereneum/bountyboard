@@ -1,0 +1,15 @@
+{{ define "content" }}
+<section class="tasks">
+    <h2>🧭 Your Pirate Profile</h2>
+
+    <div class="profile-card">
+        <p><strong>Name:</strong>  Username</p>
+        <p><strong>Gold:</strong> 💰 Gold</p>
+        <p><strong>Completed quests:</strong> CompletedCount</p>
+
+        <form method="POST" action="/reset-progress">
+            <button class="btn" type="submit">☠️ Reset Progress</button> <!-- 🔗 Backend: POST /reset-progress -->
+        </form>
+    </div>
+</section>
+{{ end }}

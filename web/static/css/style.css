@@ -7,7 +7,11 @@
    🌍 Базовые глобальные стили
 -------------------------------------------------- */
 body {
-    background: #121212 url('../images/parchment-texture.png') repeat;
+    background: #1c1c1c url('../images/map-texture.jpg') no-repeat center center;
+    background-size: cover;
+    /*Предполагается, что map-texture.jpg — это старая карта, слегка выцветшая. */
+
+    /*background: #121212 url('../images/parchment-texture.png') repeat;*/
     color: #e6d9b8;
     font-family: 'Trebuchet MS', sans-serif;
     margin: 0;
@@ -81,6 +85,7 @@ section.tasks {
 
 section.tasks h2 {
     animation: fade-in 2s ease-in;
+    color: #54290e;
 }
 
 
@@ -157,8 +162,14 @@ section.tasks h2 {
 -------------------------------------------------- */
 .task-right {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-direction: row;
+    gap: 0.4rem;
+}
+
+.task-right .btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    line-height: 1;
 }
 
 
@@ -275,17 +286,17 @@ section.tasks h2 {
 /* -------------------------------------------------
    ⚓ Верхняя панель (Header)
 -------------------------------------------------- */
+/*
 header {
     animation: slide-in 1s ease-out;
 }
 
 header h1 {
+
     font-size: 3.5rem;
     margin-bottom: 0.1rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
+    border-bottom: 2px dashed #d49f1e;
+    padding-bottom: 0.5rem;
 }
 
 header p {
@@ -304,6 +315,83 @@ header .emoji {
     font-size: 3.5rem;
     animation: float 4s ease-in-out infinite;
 }
+*/
+
+.site-header {
+    background: url('../images/wood-texture.jpg') repeat;
+    border-bottom: 3px solid #d49f1e;
+    box-shadow: 0 0 15px #000;
+    padding: 0.5rem 0;
+    font-family: 'Pirata One', cursive;
+}
+
+.site-header .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* Логотип */
+.logo {
+    font-size: 2rem;
+    color: #ffd700;
+    text-decoration: none;
+    text-shadow: 1px 1px 3px #000;
+    transition: transform 0.3s ease;
+}
+
+.logo:hover {
+    transform: rotate(-2deg);
+}
+
+/* Навигация */
+.nav-links {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-item {
+    color: #e6d9b8;
+    text-decoration: none;
+    font-size: 1.1rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 215, 0, 0.2);
+}
+
+/* Правая часть */
+.header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 1rem;
+    color: #ffd700;
+}
+
+.gold-display,
+.user-display {
+    text-shadow: 1px 1px 2px #000;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .site-header .container {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .header-right {
+        align-items: center;
+    }
+}
 
 
 /* -------------------------------------------------
@@ -313,8 +401,10 @@ footer {
     text-align: center;
     padding: 1.5rem 1rem;
     margin-top: 3rem;
+    /*margin-bottom: 1rem;*/
     font-size: 0.9rem;
-    color: #aaa;
+    /*color: #aaa;*/
+    color: #54290e;
     font-family: 'Pirata One', cursive;
 }
 
@@ -351,4 +441,40 @@ footer {
     padding: 0.4rem 0.8rem;
     border-radius: 5px;
     font-size: 0.9rem;
+}
+
+/* -------------------------------------------------
+   🧭 Счетчик монет
+-------------------------------------------------- */
+
+/*.gold-display {*/
+/*    text-align: center;*/
+/*    font-size: 1.2rem;*/
+/*    margin-top: 0.5rem;*/
+/*    color: #ffd700;*/
+/*    animation: pulse 2s infinite;*/
+/*}*/
+
+.profile-card {
+    max-width: 400px;
+    margin: 2rem auto;
+    background-color: #222;
+    padding: 1.5rem;
+    border: 2px solid #ffd700;
+    border-radius: 10px;
+    box-shadow: 0 0 15px #d49f1e55;
+    text-align: center;
+    font-family: 'Pirata One', cursive;
+}
+
+
+.compass-icon {
+    width: 50px;
+    margin-top: 0.5rem;
+    animation: rotate-slow 20s linear infinite;
+}
+
+@keyframes rotate-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }

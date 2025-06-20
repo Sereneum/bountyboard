@@ -2,13 +2,13 @@ package factory
 
 import (
 	"bountyboard/internal/adapter/cache/memory"
+	"bountyboard/internal/adapter/http/renderer"
 	inmemory "bountyboard/internal/adapter/storage/in-memory"
 	"bountyboard/internal/app"
 	"bountyboard/internal/domain/auth"
 	"bountyboard/internal/domain/task"
 	"context"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"os"
 	"time"
@@ -17,14 +17,14 @@ import (
 type Factory struct {
 	ctx       context.Context
 	cachePath string // TODO - cfg
-	tmpl      *template.Template
+	r         renderer.Renderer
 }
 
-func NewFactory(ctx context.Context, cachePath string, tmpl *template.Template) *Factory {
+func NewFactory(ctx context.Context, cachePath string, r renderer.Renderer) *Factory {
 	return &Factory{
 		ctx:       ctx,
 		cachePath: cachePath,
-		tmpl:      tmpl,
+		r:         r,
 	}
 }
 
@@ -48,10 +48,10 @@ func (f *Factory) BuildApp() (*app.App, task.FileCache, error) {
 
 	// 3. Настраиваем и возвращаем App
 	appCfg := app.Config{
-		Repo:      repo,
-		Cache:     cache,
-		Templates: f.tmpl,
-		Auth:      authService,
+		Repo:     repo,
+		Cache:    cache,
+		Renderer: f.r,
+		Auth:     authService,
 	}
 
 	a, err := app.Setup(appCfg)

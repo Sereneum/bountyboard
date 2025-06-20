@@ -1,44 +1,55 @@
-// modal.js - Управление модальными окнами
+document.addEventListener("DOMContentLoaded", () => {
+    setupModals();
+
+    document.querySelectorAll(".btn-complete").forEach(btn => {
+        btn.addEventListener("click", () => completeTask(btn));
+    });
+});
+
 function setupModals() {
-    const modals = document.querySelectorAll('.modal');
     const openButtons = document.querySelectorAll('.btn-desc');
     const closeButtons = document.querySelectorAll('.close');
 
-    openButtons.forEach((btn, idx) => {
-        btn.addEventListener('click', () => modals[idx].classList.add('show'));
+    openButtons.forEach((btn) => {
+        const modalId = btn.dataset.target;
+        btn.addEventListener('click', () => {
+            document.getElementById(modalId).classList.add('show');
+        });
     });
 
-    closeButtons.forEach((btn, idx) => {
-        btn.addEventListener('click', () => modals[idx].classList.remove('show'));
+    closeButtons.forEach((btn) => {
+        const modalId = btn.dataset.target;
+        btn.addEventListener('click', () => {
+            document.getElementById(modalId).classList.remove('show');
+        });
     });
 
     window.addEventListener('click', (e) => {
-        modals.forEach(modal => {
-            if (e.target === modal) modal.classList.remove('show');
-        });
+        if (e.target.classList.contains('modal')) {
+            e.target.classList.remove('show');
+        }
     });
 }
 
-// task.js - Работа с задачами
 async function completeTask(btn) {
     const taskItem = btn.closest(".task-item");
-    const taskId = taskItem.dataset.id || "unknown";
+    const taskId = btn.dataset.id;
 
     try {
-        await fetch("/complete-task", {
+
+        await fetch("/complete-task", { // 🔗 Backend: обработай POST /complete-task
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: taskId }),
         });
 
         taskItem.classList.add("done");
-        for (let i = 0; i < 16; i++) createCoin(taskItem);
+        for (let i = 0; i < 12; i++) createCoin(taskItem);
     } catch (err) {
-        console.error("Ошибка отправки:", err);
+        console.error("Failed to complete task:", err);
     }
 }
 
-// effects.js - Визуальные эффекты
 function createCoin(parent) {
     const coin = document.createElement("div");
     coin.classList.add("coin-burst");
@@ -54,11 +65,23 @@ function createCoin(parent) {
     setTimeout(() => coin.remove(), 1200);
 }
 
-// Инициализация
-document.addEventListener("DOMContentLoaded", () => {
-    setupModals();
-
-    document.querySelectorAll(".btn-complete").forEach(btn => {
-        btn.addEventListener("click", () => completeTask(btn));
-    });
+document.querySelectorAll(".btn-delete").forEach(btn => {
+    btn.addEventListener("click", () => deleteTask(btn));
 });
+
+async function deleteTask(btn) {
+    const taskItem = btn.closest(".task-item");
+    const taskId = btn.dataset.id;
+
+    try {
+        await fetch("/delete-task", { // 🔗 Backend: обработай POST /delete-task
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: taskId }),
+        });
+
+        taskItem.remove();
+    } catch (err) {
+        console.error("Failed to delete task:", err);
+    }
+}

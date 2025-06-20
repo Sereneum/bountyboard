@@ -3,11 +3,11 @@ package app
 import (
 	"bountyboard/internal/adapter/http/handlers"
 	authMiddleware "bountyboard/internal/adapter/http/middleware"
+	"bountyboard/internal/adapter/http/renderer"
 	"bountyboard/internal/domain/auth"
 	"bountyboard/internal/domain/task"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"html/template"
 	"net/http"
 	"time"
 )
@@ -15,11 +15,11 @@ import (
 func InitRouter(
 	taskService task.Service,
 	authService auth.Service,
-	tmpl *template.Template,
+	renderer renderer.Renderer,
 ) http.Handler {
 	authHandler := handlers.NewAuthHandler(authService)
-	taskHandler := handlers.NewTaskHandler(taskService, tmpl)
-	staticHandler := handlers.NewStaticHandler(taskService, tmpl)
+	taskHandler := handlers.NewTaskHandler(taskService)
+	staticHandler := handlers.NewStaticHandler(taskService, renderer)
 
 	r := chi.NewRouter()
 
@@ -34,6 +34,7 @@ func InitRouter(
 
 	// === SSR route (HTML-шаблоны) ===
 	r.Get("/", staticHandler.Main)
+	r.Get("/profile", staticHandler.Profile)
 
 	// === Auth (если есть) ===
 	r.Post("/login", authHandler.Login) // POST /login

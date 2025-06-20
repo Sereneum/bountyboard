@@ -1,35 +1,60 @@
 {{ define "content" }}
 <section class="tasks">
-    <h2>Your Tasks</h2>
+    <h2>📜 Your Quests</h2>
+
+    <!-- Кнопка для открытия формы добавления -->
+    <button class="btn" onclick="document.getElementById('task-form-modal').classList.add('show')">
+        ➕ Add New Task
+    </button>
+
+    <!-- Список задач -->
     <ul class="task-list">
         {{ range .Tasks }}
-        <li class="task-item {{ if .Done }}done{{ end }}">
+        <li class="task-item {{ if .Done }}done{{ end }}" data-id="{{ .ID }}">
             <div class="task-left">
                 <span class="task-title">{{ .Title }}</span>
                 <span class="task-bounty">💰 {{ .BountyAmount }} gold</span>
             </div>
             <div class="task-right">
-                <button class="btn btn-desc">📜</button>
+                <button class="btn btn-desc" data-target="modal-{{ .ID }}">📜</button>
                 {{ if .Done }}
                 <span class="status">✅ Completed</span>
                 {{ else }}
-                <button data-id="{{ .ID }}" class="btn btn-complete">Mark as Done</button>
+                <button type="button" class="btn btn-complete" data-id="{{ .ID }}">✓ Mark as Done</button>
                 {{ end }}
+                <button type="button" class="btn btn-delete" data-id="{{ .ID }}">🗑️</button>
             </div>
         </li>
-
-        <!-- Modal -->
-        <div id="modal-{{ .ID }}" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h3>{{ .Title }}</h3>
-                <p>{{ .Description }}</p>
-                <p><strong>Reward:</strong> 💰 {{ .BountyAmount }} gold</p>
-            </div>
-        </div>
         {{ else }}
         <li>No tasks yet — sail on and add some!</li>
         {{ end }}
     </ul>
 </section>
+
+<!-- 🔗 Модалки для описания задач (должны быть вне UL) -->
+{{ range .Tasks }}
+<div id="modal-{{ .ID }}" class="modal">
+    <div class="modal-content">
+        <span class="close" data-target="modal-{{ .ID }}">&times;</span>
+        <h3>{{ .Title }}</h3>
+        <p>{{ .Description }}</p>
+        <p><strong>Reward:</strong> 💰 {{ .BountyAmount }} gold</p>
+    </div>
+</div>
+{{ end }}
+
+<!-- 🔗 Модалка добавления задачи (POST /task) -->
+<div id="task-form-modal" class="modal">
+    <div class="modal-content">
+        <span class="close" data-target="task-form-modal">&times;</span>
+        <h3>🖋️ Add New Quest</h3>
+        <form method="POST" action="/task">
+            <!-- 🔗 Backend: POST /task -->
+            <input type="text" name="title" placeholder="Title of your quest" required><br><br>
+            <textarea name="description" placeholder="Quest details..." required></textarea><br><br>
+            <input type="number" name="bounty" min="1" placeholder="Reward in gold" required><br><br>
+            <button class="btn" type="submit">💰 Add to Board</button>
+        </form>
+    </div>
+</div>
 {{ end }}

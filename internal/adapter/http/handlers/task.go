@@ -3,18 +3,16 @@ package handlers
 import (
 	"bountyboard/internal/domain/task"
 	"encoding/json"
-	"html/template"
 	"log/slog"
 	"net/http"
 )
 
 type TaskHandler struct {
 	service task.Service
-	tmpl    *template.Template
 }
 
-func NewTaskHandler(service task.Service, tmpl *template.Template) *TaskHandler {
-	return &TaskHandler{service: service, tmpl: tmpl}
+func NewTaskHandler(service task.Service) *TaskHandler {
+	return &TaskHandler{service: service}
 }
 
 // List возвращает JSON-массив задач

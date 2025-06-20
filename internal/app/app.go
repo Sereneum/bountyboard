@@ -1,9 +1,9 @@
 package app
 
 import (
+	"bountyboard/internal/adapter/http/renderer"
 	"bountyboard/internal/domain/auth"
 	"bountyboard/internal/domain/task"
-	"html/template"
 	"net/http"
 )
 
@@ -12,15 +12,15 @@ type App struct {
 }
 
 type Config struct {
-	Repo      task.Repository
-	Cache     task.Cache
-	Templates *template.Template
-	Auth      auth.Service
+	Repo     task.Repository
+	Cache    task.Cache
+	Renderer renderer.Renderer
+	Auth     auth.Service
 }
 
 func Setup(cfg Config) (*App, error) {
 	taskService := task.New(cfg.Repo, cfg.Cache)
-	router := InitRouter(taskService, cfg.Auth, cfg.Templates)
+	router := InitRouter(taskService, cfg.Auth, cfg.Renderer)
 
 	return &App{
 		Router: router,
