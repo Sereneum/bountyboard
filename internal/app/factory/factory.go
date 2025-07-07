@@ -8,6 +8,7 @@ import (
 	"bountyboard/internal/domain/auth"
 	"bountyboard/internal/domain/task"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -44,7 +45,12 @@ func (f *Factory) BuildApp() (*app.App, task.FileCache, error) {
 		slog.Warn("cache file not found, starting with empty cache")
 	}
 
-	authService := auth.New("secret") // TODO os.Getenv("JWT_SECRET")
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		slog.Warn("JWT_SECRET environment variable not set")
+		return nil, nil, errors.New("JWT_SECRET not set")
+	}
+	authService := auth.New(secret)
 
 	// 3. Настраиваем и возвращаем App
 	appCfg := app.Config{

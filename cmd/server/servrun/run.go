@@ -14,10 +14,6 @@ import (
 	"time"
 )
 
-var (
-	cachePath = "task-cache.gob"
-)
-
 func Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -40,6 +36,12 @@ func Run() error {
 	//if err != nil {
 	//	return err
 	//}
+
+	cachePath := os.Getenv("CACHE_PATH")
+	if cachePath == "" {
+		slog.Warn("CACHE_PATH environment variable not set")
+		return errors.New("CACHE_PATH not set")
+	}
 
 	f := factory.NewFactory(ctx, "task-cache.gob", r)
 
